@@ -12,7 +12,7 @@ import io
 import contextlib
 import traceback
 
-st.set_page_config(page_title="Gemini 2.5 Flash Lite Chatbot — OData XML", layout="wide")
+st.set_page_config(page_title="SAP Odata ChatBot", layout="wide")
 
 # -----------------------------
 # Utility Functions
@@ -142,7 +142,7 @@ def parse_odata_xml(xml_text):
 # -----------------------------
 # Streamlit UI
 # -----------------------------
-st.title("🤖 Gemini 2.5 Flash Lite — OData XML Chatbot (Query + Visualization)")
+st.title("🤖 SAP Odata ChatBot")
 
 with st.sidebar:
     st.header("🧠 Gemini Setup")

@@ -253,8 +253,11 @@ Rules:
 6. Always valid Python one-liner or multi-line
 7. When grouping numeric columns, use aggregation (sum, mean, count)
 8. When user asks for chart, use plt.figure() and plt.show()
-9. do not answer the questions that does not involve data provided like general knowledge questions et.., you know that,instead answer as "only ask questions related to data please"
+9. Do not return entire raw tables unless user explicitly asks for "show all rows" or "list all records".
+10. When the question asks for summary, total, max, min, top N, etc., return **only an aggregated result** (not full DataFrame).
+11. Do not answer general knowledge questions (outside dataset); reply with "only ask questions related to data please".
 """
+
 
 # -----------------------------
 # User Question

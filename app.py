@@ -6,7 +6,7 @@ import requests
 # CONFIGURATION
 # ------------------------------
 NLP_API_URL = "https://api.nlpcloud.io/v1/gpu/dolphin-mixtral-8x7b/chatbot"
-NLP_API_KEY = "62862f450b91c08a9f1fabfe1ce09020c13d2149"
+NLP_API_KEY = "458273542354923845789462738452387423459"
 
 headers = {
     "Authorization": f"Token {NLP_API_KEY}",

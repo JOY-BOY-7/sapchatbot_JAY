@@ -256,6 +256,7 @@ Rules:
 9. Do not return entire raw tables unless user explicitly asks for "show all rows" or "list all records".
 10. When the question asks for summary, total, max, min, top N, etc., return **only an aggregated result** (not full DataFrame).
 11. Do not answer general knowledge questions (outside dataset); reply with "only ask questions related to data please".
+12.when question contains name, do not think its entire name, it may be the part of name so,mind that
 """
 
 

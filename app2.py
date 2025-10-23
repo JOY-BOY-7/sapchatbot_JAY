@@ -177,14 +177,14 @@ if not odata_url:
 # Build OData Query URL
 # -----------------------------
 params = {}
-if top > 0:
-    params["$top"] = top
-if filter_q.strip():
-    params["$filter"] = filter_q
-if select_q.strip():
-    params["$select"] = select_q
-if orderby_q.strip():
-    params["$orderby"] = orderby_q
+#if top > 0:
+    #params["$top"] = top
+#if filter_q.strip():
+    #params["$filter"] = filter_q
+#if select_q.strip():
+   # params["$select"] = select_q
+#if orderby_q.strip():
+    #p#arams["$orderby"] = orderby_q
 
 odata_final_url = odata_url
 if params:

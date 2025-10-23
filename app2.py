@@ -264,14 +264,36 @@ if not user_q:
     st.stop()
 
 # Step 1: Generate pandas/matplotlib expression
+# Step 1: Generate pandas/matplotlib expression
 with st.spinner("💡 Thinking with Gemini..."):
-    resp = call_gemini_json(gemini_url, gemini_key, PROMPT_PANDAS_TRANSLATE + "\nQuestion: " + user_q, timeout)
+    resp = call_gemini_json(
+        gemini_url,
+        gemini_key,
+        PROMPT_PANDAS_TRANSLATE + "\nQuestion: " + user_q,
+        timeout
+    )
     js = extract_json_from_response(resp)
 
+# Handle cases where Gemini returns text-only guidance
 if not js or "expr" not in js:
-    st.error("❌ Gemini response parsing failed:")
-    st.json(resp)
+    msg = ""
+    try:
+        msg = resp["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception:
+        pass
+
+    if msg:
+        if "only ask questions related to data" in msg.lower():
+            st.warning("💡 Gemini says: Only ask questions related to your OData data.")
+        else:
+            st.warning(f"🤖 Gemini replied:\n\n{msg}")
+    else:
+        st.error("❌ Gemini response parsing failed:")
+        st.json(resp)
+
+    # Stop here so no error trace shows below input
     st.stop()
+
 
 expr = js["expr"]
 explain = js.get("explain", "")

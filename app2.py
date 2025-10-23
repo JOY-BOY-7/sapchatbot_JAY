@@ -242,21 +242,18 @@ Column aliases (fuzzy matches allowed): {aliases}
 
 Return ONLY JSON:
   "explain": brief description
-  "expr": valid pandas or matplotlib one-liner/multiline
+  "expr": valid pandas one-liner
 
 Rules:
 1. Use closest matching column names
 2. String comparisons are case-insensitive and fuzzy (handled automatically)
 3. Numeric operations safe
 4. Never hallucinate columns/values
-5. You can return matplotlib chart code (bar, line, pie, etc.)
-6. Always valid Python one-liner or multi-line
+5. No loops/imports/prints
+6. Always valid Python one-liner
 7. When grouping numeric columns, use aggregation (sum, mean, count)
-8. When user asks for chart, use plt.figure() and plt.show()
-9. Do not return entire raw tables unless user explicitly asks for "show all rows" or "list all records".
-10. When the question asks for summary, total, max, min, top N, etc., return **only an aggregated result** (not full DataFrame).
-11. Do not answer general knowledge questions (outside dataset); reply with "only ask questions related to data please".
-12.when question contains name, do not think its entire name, it may be the part of name so,mind that
+8. When a name came up keep in mind that its not full name only part of name
+9. Do not answer general knowledge questions (outside dataset); reply with "only ask questions related to data please".
 """
 
 

@@ -253,6 +253,7 @@ Rules:
 6. Always valid Python one-liner or multi-line
 7. When grouping numeric columns, use aggregation (sum, mean, count)
 8. When user asks for chart, use plt.figure() and plt.show()
+9. do not answer the questions that does not involve data provided like general knowledge questions et.., you know that,instead answer as "only ask questions related to data please"
 """
 
 # -----------------------------

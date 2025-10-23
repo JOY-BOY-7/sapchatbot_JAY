@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -12,7 +13,7 @@ import io
 import contextlib
 import traceback
 
-st.set_page_config(page_title="Gemini 2.5 Flash Lite Chatbot — OData XML", layout="wide")
+st.set_page_config(page_title="SAP ODATA CHATBOT", layout="wide")
 
 # -----------------------------
 # Utility Functions
@@ -89,13 +90,14 @@ def safe_exec(expr, df):
             except:
                 exec(expr, {}, local_env)
                 # Look for last meaningful object in local_env
-                for k, v in reversed(local_env.items()):
+                result = None
+                for k, v in reversed(list(local_env.items())):
                     if isinstance(v, (pd.DataFrame, pd.Series, plt.Figure)):
                         result = v
                         break
-                else:
+                if result is None:
                     result = "✅ Code executed successfully (no direct result returned)"
-        except Exception as e:
+        except Exception:
             st.error(f"⚠️ Error executing expression:\n\n{traceback.format_exc()}")
             return None
     return result
@@ -142,35 +144,43 @@ def parse_odata_xml(xml_text):
 # -----------------------------
 # Streamlit UI
 # -----------------------------
-st.title("🤖 Gemini 2.5 Flash Lite — OData XML Chatbot (Query + Visualization)")
+st.title("🤖 SAP Odata ChatBot")
 
 with st.sidebar:
-    st.header("🧠 Gemini Setup")
-    gemini_url = st.text_input(
-        "REST Endpoint URL",
-        value="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
-    )
-    gemini_key = st.text_input("Gemini API Key (AIza...)", type="password")
+    st.header("🧠 Gemini & OData Configuration")
+    st.info("Gemini API key, Gemini URL, OData URL and optional query parameters are configured in the backend (environment variables).")
     timeout = st.number_input("Timeout (sec)", value=30, min_value=5, max_value=120)
-
-    st.header("🌐 OData Configuration")
-    odata_url = st.text_input("OData Service URL (EntitySet)", placeholder="https://server/sap/opu/odata/.../EntitySet")
-    username = st.text_input("Username (optional)")
-    password = st.text_input("Password (optional)", type="password")
-
     st.markdown("---")
-    st.header("🔍 Optional Query Parameters")
-    top = st.number_input("$top (limit rows)", min_value=0, value=0, help="0 means no limit")
-    filter_q = st.text_input("$filter condition", placeholder="Customer eq 'ABC' or Amount gt 1000")
-    select_q = st.text_input("$select columns", placeholder="Customer,Amount,Date")
-    orderby_q = st.text_input("$orderby", placeholder="Amount desc")
+    st.caption("To change the API key / OData URL / filters, set environment variables in the backend process (see README).")
 
-if not gemini_url or not gemini_key:
-    st.warning("Please enter your Gemini URL and API key.")
+# -----------------------------
+# Read sensitive / backend-provided config from environment
+# -----------------------------
+DEFAULT_GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
+gemini_url = os.environ.get("GEMINI_URL", DEFAULT_GEMINI_URL)
+gemini_key = "AIzaSyB-_pla60uud1Pr3CrYkXjj6CR3jpMczlk"
+odata_url = "https://20d5680ebd4b.ngrok-free.app/odata/ZChatSet"
+
+# Optional OData credentials (optional)
+username = os.environ.get("ODATA_USERNAME", "").strip()
+password = os.environ.get("ODATA_PASSWORD", "").strip()
+
+# Optional OData query parameters (hidden from frontend)
+try:
+    top = int(os.environ.get("ODATA_TOP", "0"))
+except:
+    top = 0
+filter_q = os.environ.get("ODATA_FILTER", "").strip()
+select_q = os.environ.get("ODATA_SELECT", "").strip()
+orderby_q = os.environ.get("ODATA_ORDERBY", "").strip()
+
+# Validate critical config
+if not gemini_key:
+    st.warning("Gemini API key not provided in environment (GEMINI_API_KEY).")
     st.stop()
 
 if not odata_url:
-    st.info("Enter OData service URL to fetch data.")
+    st.info("OData URL not provided in environment (ODATA_URL).")
     st.stop()
 
 # -----------------------------
@@ -179,18 +189,18 @@ if not odata_url:
 params = {}
 if top > 0:
     params["$top"] = top
-if filter_q.strip():
+if filter_q:
     params["$filter"] = filter_q
-if select_q.strip():
+if select_q:
     params["$select"] = select_q
-if orderby_q.strip():
+if orderby_q:
     params["$orderby"] = orderby_q
 
 odata_final_url = odata_url
 if params:
     odata_final_url += "?" + urlencode(params, safe="=(),' ")
 
-st.write("📡 Fetching from:", odata_final_url)
+st.write("📡 Fetching OData (URL configured in backend)")
 
 # -----------------------------
 # Fetch OData Data
@@ -308,9 +318,12 @@ Give the **answer with explanation**, in natural English.
 with st.spinner("🗣️ Generating natural language answer..."):
     resp2 = call_gemini_json(gemini_url, gemini_key, PROMPT_ENGLISH, timeout)
     try:
-        text = resp2["candidates"][0]["content"]["parts"][0]["text"]
+        text = resp2["candidates"][0]["content"][0]["text"]
     except:
-        text = str(resp2)
+        try:
+            text = resp2["candidates"][0]["content"]["parts"][0]["text"]
+        except:
+            text = str(resp2)
 
 st.markdown("### 💬 Chatbot Answer")
 st.write(text)

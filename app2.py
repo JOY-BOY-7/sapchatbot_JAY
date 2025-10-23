@@ -159,11 +159,11 @@ with st.sidebar:
     password = st.text_input("Password (optional)", type="password")
 
     st.markdown("---")
-    st.header("🔍 Optional Query Parameters")
-    top = st.number_input("$top (limit rows)", min_value=0, value=0, help="0 means no limit")
-    filter_q = st.text_input("$filter condition", placeholder="Customer eq 'ABC' or Amount gt 1000")
-    select_q = st.text_input("$select columns", placeholder="Customer,Amount,Date")
-    orderby_q = st.text_input("$orderby", placeholder="Amount desc")
+    #st.header("🔍 Optional Query Parameters")
+    #top = st.number_input("$top (limit rows)", min_value=0, value=0, help="0 means no limit")
+    #filter_q = st.text_input("$filter condition", placeholder="Customer eq 'ABC' or Amount gt 1000")
+    #select_q = st.text_input("$select columns", placeholder="Customer,Amount,Date")
+    #orderby_q = st.text_input("$orderby", placeholder="Amount desc")
 
 if not gemini_url or not gemini_key:
     st.warning("Please enter your Gemini URL and API key.")

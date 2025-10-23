@@ -254,6 +254,9 @@ Rules:
 7. When grouping numeric columns, use aggregation (sum, mean, count)
 8. When a name came up keep in mind that its not full name only part of name
 9. Do not answer general knowledge questions (outside dataset); reply with "only ask questions related to data please".
+10. Always handle NaN values safely:
+   - For string filters: use str.contains(..., na=False)
+   - For numeric operations: safely handle empty sequences
 """
 
 

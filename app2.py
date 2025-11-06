@@ -227,9 +227,17 @@ Return ONLY JSON:
 10. Always handle NaN values safely:
    - For string filters: use str.contains(..., na=False)
    - For numeric operations: safely handle empty sequences
-11. Extract the keyword from the question. Search it in ALL string columns dynamically:
-df.select_dtypes(include=['object','string'])
-Then filter rows where any string column contains that keyword.
+11. Extract the keyword (or concept) from the user question. Then search it in ALL string-type columns dynamically, not just specific column names.
+
+Use:
+string_cols = df.select_dtypes(include=['object','string']).columns
+
+Build a boolean mask like:
+mask = df[string_cols].apply(
+    lambda col: col.str.contains(keyword, case=False, na=False, regex=False)
+).any(axis=1)
+
+Always disable regex to avoid '.' wildcard behavior.
 """
 
 # -----------------------------

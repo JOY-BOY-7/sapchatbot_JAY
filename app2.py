@@ -5,12 +5,14 @@ import requests
 import json
 import re
 import difflib
+import xml.etree.ElementTree as ET
+from urllib.parse import urlencode
 import matplotlib.pyplot as plt
 import io
 import contextlib
 import traceback
 
-st.set_page_config(page_title="CSV Data ChatBot", layout="wide")
+st.set_page_config(page_title="SAP Odata ChatBot", layout="wide")
 
 # -----------------------------
 # Utility Functions
@@ -92,9 +94,36 @@ def call_gemini_json(url, key, prompt, timeout=40):
         return {"text": r.text}
 
 # -----------------------------
+# OData XML Parsing
+# -----------------------------
+def parse_odata_xml(xml_text):
+    ns = {
+        'atom': 'http://www.w3.org/2005/Atom',
+        'm': 'http://schemas.microsoft.com/ado/2007/08/dataservices/metadata',
+        'd': 'http://schemas.microsoft.com/ado/2007/08/dataservices'
+    }
+    root = ET.fromstring(xml_text)
+    entries = root.findall('.//atom:entry', ns)
+    data = []
+
+    for entry in entries:
+        props = entry.find('.//m:properties', ns)
+        if props is None:
+            continue
+        record = {}
+        for child in props:
+            tag = re.sub(r'^{.*}', '', child.tag)
+            record[tag] = child.text
+        data.append(record)
+
+    if not data:
+        raise ValueError("No valid data entries found in OData response.")
+    return pd.DataFrame(data)
+
+# -----------------------------
 # Streamlit UI
 # -----------------------------
-st.title("🤖 CSV Data ChatBot")
+st.title("🤖 SAP Odata / CSV / Excel ChatBot")
 
 with st.sidebar:
     st.header("🧠 Gemini Setup")
@@ -105,27 +134,58 @@ with st.sidebar:
     gemini_key = st.text_input("Gemini API Key", type="password")
     timeout = st.number_input("Timeout (sec)", value=30, min_value=5, max_value=120)
 
-    st.header("📁 CSV Upload")
-    file = st.file_uploader("Upload CSV", type=["csv"])
+    st.header("📌 Data Source")
+    source = st.selectbox("Select Data Source", ["OData", "CSV", "Excel"])
+
+    if source == "OData":
+        odata_url = st.text_input("OData Service URL (EntitySet)")
+        username = st.text_input("Username (optional)")
+        password = st.text_input("Password (optional)", type="password")
+
+    if source == "CSV":
+        csv_file = st.file_uploader("Upload CSV", type=["csv"])
+
+    if source == "Excel":
+        excel_file = st.file_uploader("Upload Excel", type=["xlsx", "xls"])
 
 if not gemini_url or not gemini_key:
-    st.warning("Provide Gemini endpoint and key.")
-    st.stop()
-
-if not file:
-    st.info("Upload a CSV file to continue.")
+    st.warning("Please enter your Gemini endpoint and API key.")
     st.stop()
 
 # -----------------------------
-# Load CSV
+# Load Data According to Source
 # -----------------------------
-df = pd.read_csv(file)
+if source == "OData":
+    if not odata_url:
+        st.info("Enter OData URL.")
+        st.stop()
 
-# Normalize column names
+    auth = (username, password) if username and password else None
+    resp = requests.get(odata_url, auth=auth, headers={"Accept": "application/atom+xml"}, timeout=timeout)
+    if resp.status_code != 200:
+        st.error("OData fetch failed!")
+        st.text(resp.text)
+        st.stop()
+    df = parse_odata_xml(resp.text)
+
+elif source == "CSV":
+    if not csv_file:
+        st.info("Upload a CSV file.")
+        st.stop()
+    df = pd.read_csv(csv_file)
+
+elif source == "Excel":
+    if not excel_file:
+        st.info("Upload an Excel file.")
+        st.stop()
+    df = pd.read_excel(excel_file)
+
+# -----------------------------
+# Normalize & prep DataFrame
+# -----------------------------
 orig_cols = df.columns.tolist()
 norm_map = {c: normalize_col(c) for c in orig_cols}
 df.columns = [norm_map[c] for c in orig_cols]
-reverse_map = {v: k for k, v in norm_map.items()}
 fuzzy_map = fuzzy_column_map(df.columns)
 
 for c in df.columns:
@@ -135,7 +195,7 @@ st.success(f"✅ Loaded {len(df)} rows.")
 st.dataframe(df.head(100))
 
 # -----------------------------
-# Schema
+# Prepare Prompt
 # -----------------------------
 schema = []
 for c in df.columns:
@@ -159,27 +219,26 @@ Return ONLY JSON:
 # -----------------------------
 # User Question
 # -----------------------------
-user_q = st.text_input("Ask something about your CSV data:")
+user_q = st.text_input("Ask your question:")
 if not user_q:
     st.stop()
 
-# Step 1: get expression
-with st.spinner("💡 Thinking with Gemini..."):
+with st.spinner("💡 Thinking..."):
     resp = call_gemini_json(gemini_url, gemini_key, PROMPT_PANDAS_TRANSLATE + "\nQuestion: " + user_q, timeout)
     js = extract_json_from_response(resp)
 
 if not js or "expr" not in js:
-    st.warning("⚠️ Could not parse expression from LLM.")
+    st.warning("Could not parse expression.")
     st.json(resp)
     st.stop()
 
 expr = js["expr"]
 explain = js.get("explain", "")
 
-# Step 2: Execute
+# Execute
 result = safe_exec(expr, df)
 
-# Step 3: Display
+# Display
 if isinstance(result, pd.DataFrame):
     st.dataframe(result)
 elif isinstance(result, pd.Series):
@@ -190,25 +249,23 @@ else:
         st.pyplot(fig)
         plt.close(fig)
     else:
-        st.write(f"✅ Result: {result}")
+        st.write(result)
 
-# Step 4: Final English answer
+# Explanation
 PROMPT_ENGLISH = f"""
 Question: {user_q}
 Result: {repr(result)}
-Explain the answer clearly.
+Explain clearly.
 """
-
-with st.spinner("🗣️ Explaining..."):
-    resp2 = call_gemini_json(gemini_url, gemini_key, PROMPT_ENGLISH, timeout)
-    try:
-        text = resp2["candidates"][0]["content"]["parts"][0]["text"]
-    except:
-        text = str(resp2)
+resp2 = call_gemini_json(gemini_url, gemini_key, PROMPT_ENGLISH, timeout)
+try:
+    text = resp2["candidates"][0]["content"]["parts"][0]["text"]
+except:
+    text = str(resp2)
 
 st.markdown("### 💬 Chatbot Answer")
 st.write(text)
 
 st.markdown("---")
-st.code(expr, language="python")
-st.caption(f"Explanation: {explain}")
+st.code(expr)
+st.caption(explain)

@@ -227,7 +227,10 @@ Return ONLY JSON:
 10. Always handle NaN values safely:
    - For string filters: use str.contains(..., na=False)
    - For numeric operations: safely handle empty sequences
-11. Extract the keyword (or concept) from the user question. Then search it in ALL string-type columns dynamically, not just specific column names.
+11. i will give you an example understand it and dynamically answer that of questions
+example: user question:total revenue for GST?
+gemini generated code:df[df.select_dtypes(include=['object','string']).apply(lambda col: col.str.contains('gst', case=False, na=False)).any(axis=1)]['gross_amt'].sum()
+
 """
 
 # -----------------------------

@@ -214,6 +214,22 @@ Column aliases (fuzzy matches allowed): {aliases}
 Return ONLY JSON:
   "explain": brief description
   "expr": valid pandas one-liner
+  Rules:
+1. Use closest matching column names
+2. String comparisons are case-insensitive and fuzzy (handled automatically)
+3. Numeric operations safe
+4. Never hallucinate columns/values
+5. No loops/imports/prints
+6. Always valid Python one-liner
+7. When grouping numeric columns, use aggregation (sum, mean, count)
+8. When a name came up keep in mind that its not full name only part of name
+9. Do not answer general knowledge questions (outside dataset); reply with "only ask questions related to data please".
+10. Always handle NaN values safely:
+   - For string filters: use str.contains(..., na=False)
+   - For numeric operations: safely handle empty sequences
+11. Extract the keyword from the question. Search it in ALL string columns dynamically:
+df.select_dtypes(include=['object','string'])
+Then filter rows where any string column contains that keyword.
 """
 
 # -----------------------------

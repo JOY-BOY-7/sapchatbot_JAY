@@ -227,11 +227,6 @@ Return ONLY JSON:
 10. Always handle NaN values safely:
    - For string filters: use str.contains(..., na=False)
    - For numeric operations: safely handle empty sequences
-11. i will give you an example understand it and dynamically answer that of questions
-example 1: user question:total revenue for GST?
-gemini generated code:df[df.select_dtypes(include=['object','string']).apply(lambda col: col.str.contains('gst', case=False, na=False)).any(axis=1)]['gross_amt'].sum()
-example 2:What was the revenue under EAP and Other Grants in April FY 2024-25?
-gemini generated code:df[(df['"search all columns of cat"'].str.contains('EAP and Other Grants', case=False, na=False)) & (df['month'] == 'Apr') & (df['fin_year'] == 'FY 2024-25')]['gross_amt'].sum()
 """
 
 # -----------------------------

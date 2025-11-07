@@ -195,14 +195,48 @@ st.write("📡 Fetching from:", odata_final_url)
 # -----------------------------
 # Fetch OData Data
 # -----------------------------
+# -----------------------------
+# Fetch OData Data (with proxy support)
+# -----------------------------
 try:
-    auth = (username, password) if username and password else None
-    resp = requests.get(odata_final_url, auth=auth, headers={"Accept": "application/atom+xml"}, timeout=timeout)
+    # Detect if user is using proxy (Flask app) or direct SAP URL
+    is_proxy = "8080/odata" in odata_final_url or "loca.lt/odata" in odata_final_url
+
+    if is_proxy:
+        # Send credentials via query parameters for Flask proxy
+        params = {
+            "username": username,
+            "password": password,
+            "$format": "json"
+        }
+        resp = requests.get(
+            odata_final_url,
+            params=params,
+            headers={"Accept": "application/json"},
+            timeout=timeout
+        )
+    else:
+        # Direct SAP connection (Basic Auth)
+        auth = (username, password) if username and password else None
+        resp = requests.get(
+            odata_final_url,
+            auth=auth,
+            headers={"Accept": "application/atom+xml"},
+            timeout=timeout
+        )
+
     if resp.status_code != 200:
         st.error(f"❌ OData fetch failed: {resp.status_code}")
         st.text(resp.text)
         st.stop()
-    df = parse_odata_xml(resp.text)
+
+    # Parse automatically depending on type
+    content_type = resp.headers.get("Content-Type", "")
+    if "json" in content_type:
+        df = pd.DataFrame(resp.json().get("d", {}).get("results", []))
+    else:
+        df = parse_odata_xml(resp.text)
+
 except Exception as e:
     st.error(f"❌ Failed to fetch or parse OData: {e}")
     st.stop()

@@ -139,11 +139,42 @@ class SSLAdapter(HTTPAdapter):
     def init_poolmanager(self, *args, **kwargs):
         ctx = ssl.create_default_context()
         ctx.options |= 0x4  # SSL_OP_LEGACY_SERVER_CONNECT
-        ctx.check_hostname = False      # ✅ Disable hostname check
-        ctx.verify_mode = ssl.CERT_NONE # ✅ Allow self-signed / legacy certs
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
         kwargs['ssl_context'] = ctx
         return super(SSLAdapter, self).init_poolmanager(*args, **kwargs)
 
+# -----------------------------
+# Cached OData Fetch
+# -----------------------------
+@st.cache_data(show_spinner=False)
+def fetch_odata_data(odata_url, username, password, timeout):
+    session = requests.Session()
+    session.mount("https://", SSLAdapter())
+
+    is_proxy = "8080/odata" in odata_url or "loca.lt/odata" in odata_url
+    if is_proxy:
+        params = {"username": username, "password": password, "$format": "json"}
+        resp = session.get(
+            odata_url, params=params, headers={"Accept": "application/json"},
+            timeout=timeout, verify=False
+        )
+    else:
+        auth = (username, password) if username and password else None
+        resp = session.get(
+            odata_url, auth=auth, headers={"Accept": "application/atom+xml"},
+            timeout=timeout, verify=False
+        )
+
+    if resp.status_code != 200:
+        raise Exception(f"OData fetch failed: {resp.status_code}\n{resp.text}")
+
+    if "json" in resp.headers.get("Content-Type", ""):
+        df = pd.DataFrame(resp.json().get("d", {}).get("results", []))
+    else:
+        df = parse_odata_xml(resp.text)
+
+    return df
 
 # -----------------------------
 # Streamlit UI
@@ -160,10 +191,14 @@ with st.sidebar:
     timeout = st.number_input("Timeout (sec)", value=30, min_value=5, max_value=120)
 
     st.header("🌐 OData Configuration")
-    odata_url = st.text_input("OData Service URL (EntitySet)",
-                              placeholder="https://server/sap/opu/odata/.../EntitySet")
+    odata_url = st.text_input("OData Service URL (EntitySet)", placeholder="https://server/sap/opu/odata/.../EntitySet")
     username = st.text_input("Username (optional)")
     password = st.text_input("Password (optional)", type="password")
+
+    st.markdown("---")
+    if st.button("🔄 Refresh OData Cache"):
+        st.cache_data.clear()
+        st.success("✅ OData cache cleared. Data will refetch on next run.")
 
 if not gemini_url or not gemini_key:
     st.warning("Please enter your Gemini URL and API key.")
@@ -174,44 +209,11 @@ if not odata_url:
     st.stop()
 
 # -----------------------------
-# Fetch OData Data
+# Fetch OData Data (cached)
 # -----------------------------
 st.write("📡 Fetching from:", odata_url)
 try:
-    session = requests.Session()
-    session.mount("https://", SSLAdapter())
-
-    is_proxy = "8080/odata" in odata_url or "loca.lt/odata" in odata_url
-    if is_proxy:
-        params = {"username": username, "password": password, "$format": "json"}
-        resp = session.get(
-            odata_url,
-            params=params,
-            headers={"Accept": "application/json"},
-            timeout=timeout,
-            verify=False
-        )
-    else:
-        auth = (username, password) if username and password else None
-        resp = session.get(
-            odata_url,
-            auth=auth,
-            headers={"Accept": "application/atom+xml"},
-            timeout=timeout,
-            verify=False
-        )
-
-    if resp.status_code != 200:
-        st.error(f"❌ OData fetch failed: {resp.status_code}")
-        st.text(resp.text)
-        st.stop()
-
-    content_type = resp.headers.get("Content-Type", "")
-    if "json" in content_type:
-        df = pd.DataFrame(resp.json().get("d", {}).get("results", []))
-    else:
-        df = parse_odata_xml(resp.text)
-
+    df = fetch_odata_data(odata_url, username, password, timeout)
 except Exception as e:
     st.error(f"❌ Failed to fetch or parse OData: {e}")
     st.stop()
@@ -228,11 +230,11 @@ fuzzy_map = fuzzy_column_map(df.columns)
 for c in df.columns:
     df[c] = pd.to_numeric(df[c], errors='ignore')
 
-st.success(f"✅ Loaded {len(df)} rows from OData service.")
+st.success(f"✅ Loaded {len(df)} rows from OData service (cached).")
 st.dataframe(df.head(100))
 
 # -----------------------------
-# Gemini Prompt Template (Complete 15 Rules)
+# Gemini Prompt Template
 # -----------------------------
 schema = []
 for c in df.columns:
@@ -338,7 +340,7 @@ PROMPT_ENGLISH = f"""
 You are a helpful assistant. 
 Question: {user_q}
 The result is: {repr(result)}
-Give the answer with explanation in simple English.
+Give the answer with explanation in simple English not like you are analyzing the data, explain to the user,just simple explanation is enougfh.
 """
 with st.spinner("🗣️ Generating natural language answer..."):
     resp2 = call_gemini_json(gemini_url, gemini_key, PROMPT_ENGLISH, timeout)
